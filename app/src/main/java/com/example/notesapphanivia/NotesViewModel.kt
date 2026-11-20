@@ -11,7 +11,6 @@ import kotlinx.coroutines.launch
 class NotesViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getInstance(application).noteDao()
 
-    // READ: Mengubah Flow dari database menjadi StateFlow yang siap dibaca UI
     val notes: StateFlow<List<Note>> = dao.getAll()
         .stateIn(
             scope = viewModelScope,
@@ -19,22 +18,28 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-    // CREATE
-    fun addNote(title: String) {
-        val text = title.trim()
-        if (text.isEmpty()) return
-        viewModelScope.launch { dao.insert(Note(title = text)) }
+    // CREATE: Menerima title dan note
+    fun addNote(title: String, note: String) {
+        val cleanTitle = title.trim()
+        val cleanNote = note.trim()
+        if (cleanTitle.isEmpty() || cleanNote.isEmpty()) return
+        viewModelScope.launch {
+            dao.insert(Note(title = cleanTitle, note = cleanNote))
+        }
     }
 
-    // UPDATE
-    fun updateNote(note: Note, newTitle: String) {
-        val text = newTitle.trim()
-        if (text.isEmpty()) return
-        viewModelScope.launch { dao.update(note.copy(title = text)) }
+    // UPDATE: Mengubah title dan note
+    fun updateNote(item: Note, newTitle: String, newNote: String) {
+        val cleanTitle = newTitle.trim()
+        val cleanNote = newNote.trim()
+        if (cleanTitle.isEmpty() || cleanNote.isEmpty()) return
+        viewModelScope.launch {
+            dao.update(item.copy(title = cleanTitle, note = cleanNote))
+        }
     }
 
     // DELETE
-    fun deleteNote(note: Note) {
-        viewModelScope.launch { dao.delete(note) }
+    fun deleteNote(item: Note) {
+        viewModelScope.launch { dao.delete(item) }
     }
 }

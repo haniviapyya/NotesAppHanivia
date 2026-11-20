@@ -22,15 +22,16 @@ fun NotesScreen(
     modifier: Modifier = Modifier,
     vm: NotesViewModel = viewModel()
 ) {
-    // Mengamati data catatan secara otomatis dari ViewModel
     val notes by vm.notes.collectAsState()
 
-    // State untuk input catatan baru
-    var input by rememberSaveable { mutableStateOf("") }
+    // State form input (title & note)
+    var inputTitle by rememberSaveable { mutableStateOf("") }
+    var inputNote by rememberSaveable { mutableStateOf("") }
 
-    // State untuk mode edit inline (menyimpan ID & teks catatan yang sedang diedit)
+    // State mode edit inline (id, title & note)
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var editingText by rememberSaveable { mutableStateOf("") }
+    var editingTitle by rememberSaveable { mutableStateOf("") }
+    var editingNote by rememberSaveable { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -40,31 +41,37 @@ fun NotesScreen(
         Text(text = "Catatan Saya", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(12.dp))
 
-        // 1. FORM INPUT (CREATE)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // 1. FORM INPUT (CREATE: Title & Note)
+        OutlinedTextField(
+            value = inputTitle,
+            onValueChange = { inputTitle = it },
+            label = { Text("Judul catatan") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = inputNote,
+            onValueChange = { inputNote = it },
+            label = { Text("Isi catatan") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = {
+                vm.addNote(inputTitle, inputNote)
+                inputTitle = ""
+                inputNote = ""
+            },
+            modifier = Modifier.align(Alignment.End)
         ) {
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                label = { Text("Catatan baru") },
-                singleLine = true,
-                modifier = Modifier.weight(1f)
+            Icon(
+                painter = painterResource(R.drawable.ic_add),
+                contentDescription = null,
+                modifier = Modifier.size(ButtonDefaults.IconSize)
             )
-            Button(onClick = {
-                vm.addNote(input)
-                input = "" // Kosongkan kolom setelah ditambah
-            }) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_add),
-                    contentDescription = null,
-                    modifier = Modifier.size(ButtonDefaults.IconSize)
-                )
-                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                Text("Tambah")
-            }
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text("Tambah")
         }
 
         Text(
@@ -81,26 +88,28 @@ fun NotesScreen(
             }
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(notes, key = { it.id }) { note ->
-                    // Cek apakah baris ini sedang dalam mode edit
-                    if (editingId == note.id) {
+                items(notes, key = { it.id }) { item ->
+                    if (editingId == item.id) {
                         NoteItemEditing(
-                            text = editingText,
-                            onTextChange = { editingText = it },
+                            title = editingTitle,
+                            note = editingNote,
+                            onTitleChange = { editingTitle = it },
+                            onNoteChange = { editingNote = it },
                             onSave = {
-                                vm.updateNote(note, editingText)
+                                vm.updateNote(item, editingTitle, editingNote)
                                 editingId = null
                             },
                             onCancel = { editingId = null }
                         )
                     } else {
                         NoteItem(
-                            note = note,
+                            item = item,
                             onEdit = {
-                                editingId = note.id
-                                editingText = note.title
+                                editingId = item.id
+                                editingTitle = item.title
+                                editingNote = item.note
                             },
-                            onDelete = { vm.deleteNote(note) }
+                            onDelete = { vm.deleteNote(item) }
                         )
                     }
                     HorizontalDivider()
@@ -110,16 +119,24 @@ fun NotesScreen(
     }
 }
 
-// Tampilan satu baris catatan (Mode Normal)
+// Tampilan satu baris catatan (Menampilkan Title, Note, dan ID)
 @Composable
 fun NoteItem(
-    note: Note,
+    item: Note,
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {}
 ) {
     ListItem(
-        headlineContent = { Text(note.title) },
-        supportingContent = { Text("ID: ${note.id}") },
+        overlineContent = { Text("ID: ${item.id}") },
+        headlineContent = {
+            Text(
+                text = item.title,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        supportingContent = {
+            Text(text = item.note)
+        },
         trailingContent = {
             Row {
                 IconButton(onClick = onEdit) {
@@ -141,39 +158,52 @@ fun NoteItem(
     )
 }
 
-// Tampilan satu baris catatan saat sedang diedit (Mode Edit Inline)
+// Tampilan form edit inline (Title & Note)
 @Composable
 fun NoteItemEditing(
-    text: String,
-    onTextChange: (String) -> Unit,
+    title: String,
+    note: String,
+    onTitleChange: (String) -> Unit,
+    onNoteChange: (String) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 8.dp)
     ) {
         OutlinedTextField(
-            value = text,
-            onValueChange = onTextChange,
-            label = { Text("Ubah catatan") },
+            value = title,
+            onValueChange = onTitleChange,
+            label = { Text("Ubah judul") },
             singleLine = true,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.fillMaxWidth()
         )
-        IconButton(onClick = onSave) {
-            Icon(
-                painter = painterResource(R.drawable.ic_check),
-                contentDescription = "Simpan",
-                tint = Color(0xFF4CAF50)
-            )
-        }
-        IconButton(onClick = onCancel) {
-            Icon(
-                painter = painterResource(R.drawable.ic_close),
-                contentDescription = "Batal"
-            )
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = note,
+            onValueChange = onNoteChange,
+            label = { Text("Ubah isi catatan") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            IconButton(onClick = onSave) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_check),
+                    contentDescription = "Simpan",
+                    tint = Color(0xFF4CAF50)
+                )
+            }
+            IconButton(onClick = onCancel) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_close),
+                    contentDescription = "Batal"
+                )
+            }
         }
     }
 }
@@ -182,6 +212,12 @@ fun NoteItemEditing(
 @Composable
 fun NoteItemPreview() {
     NotesAppHaniviaTheme {
-        NoteItem(note = Note(id = 1, title = "Belajar Room Database"))
+        NoteItem(
+            item = Note(
+                id = 1,
+                title = "Belajar Room Database",
+                note = "Membuat aplikasi CRUD catatan dengan Jetpack Compose"
+            )
+        )
     }
 }
